@@ -1,0 +1,393 @@
+---
+title: "Untitled"
+author: "beatriz"
+date: "13/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'G:/Meu Drive/beatriz.moura@usp.br 2020-10-13 08 24/Projects/Master')
+base <- 210 # width of images
+quant <- 5
+```
+
+```{r libraries, include=FALSE}
+library(tidyverse)
+library(ggnewscale)
+library(cowplot)
+library(patchwork)
+source('rscript/00_Maps_eng.R')
+```
+
+```{r reading files, echo=FALSE, include=FALSE}
+acc <- readr::read_csv('results/02_housing_acc_segreg/table/accessibility_distances.csv') %>% 
+  dplyr::mutate(threshold = paste0(threshold, 'min'),
+                acc = perc) %>% 
+  dplyr::filter(threshold=='60min', year == '2017') %>% 
+  dplyr::rename(id = origin) %>% 
+  dplyr::select(id, acc)
+
+load('results/02_housing_acc_segreg/table/segregation/localSegreg.rda')
+segreg <- lSeg %>% 
+  dplyr::filter(measure %in% 'G3_G3', bandwd == 1500) %>% 
+  dplyr::rename(seg = value) %>% 
+  dplyr::select(id, seg)
+
+df <- dplyr::full_join(acc, segreg) %>% 
+  dplyr::mutate(acc = ifelse(is.na(acc), 0, acc),
+                seg = ifelse(is.na(seg), 0, seg))
+
+# housing 
+housing <- sf::read_sf('data/housing/private/private_scs_paper.shp', 
+                       crs = crsdegrees, quiet = T) %>% 
+  sf::st_intersection(grid) %>% 
+  dplyr::rename(id_grid = id.1)%>% 
+  dplyr::mutate(period = factor(period,
+                                levels = c('Pre - PMCMV', 'Post - PMCMV')),
+                class = factor(class, 
+                               levels = c('low', 'medium', 'high')))
+
+# zeis
+zeis02 <- sf::st_read('data/shp/zones/zeis_2002_clean.shp', quiet = T) %>% 
+  dplyr::mutate(zeis = as.numeric(stringr::str_replace_all(Layer, 'ZEIS\\_|\\_LIMITE','')),
+                id = 1:dplyr::n()) %>% 
+  dplyr::select(id, zeis) %>% 
+  sf::st_transform(prjdegrees) 
+
+zeis02_sf <- zeis02 %>% 
+  dplyr::mutate(year = 'PDE 2002') 
+
+zeis <- zeis02 %>%
+  dplyr::filter(zeis!=1) %>%
+  sf::st_intersection(grid) %>%
+  dplyr::rename(id_grid = id.1) %>%
+  dplyr::left_join(df, by = c('id_grid' = 'id')) %>%
+  dplyr::group_by(id, zeis) %>%
+  dplyr::summarise(acc = mean(acc, na.rm=T),
+                   seg = mean(seg, na.rm = T)) %>%
+  dplyr::ungroup()
+
+zeis$area <- sf::st_area(sf::st_transform(zeis, crs = crsutm))
+
+# scenarios 
+scenarios <- readr::read_csv('results/03_zeis/table/scenarios_paper.csv')
+
+# population
+pop_micro <- readr::read_csv('data/population/population_micro_grid2.csv')
+```
+
+```{r functions}
+fig03 <- function(mea){
+  segregation <- lSeg %>% 
+  dplyr::filter(measure == mea) %>% 
+  dplyr::mutate(logvalue = log10(value),
+                bandwd = paste0(trimws(format(bandwd,big.mark = ',', decimal.mark = '.')),'m'))
+
+max <- segregation %>% 
+  dplyr::filter(!is.infinite(value)) %>% 
+  dplyr::summarise(max= max(value, na.rm=T)) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::left_join(segregation, by=c('max'='value')) %>% 
+  dplyr::distinct(max, .keep_all=T)
+
+brk <- segregation %>% 
+  dplyr::filter(bandwd == max$bandwd, mtype == max$mtype) %>% 
+  .$value %>% 
+  quantile(.,seq(0,1,1/quant), names=F)
+
+p <- segregation %>% 
+  dplyr::mutate(range = as.numeric(as.character(cut(value, 
+                                                    breaks = brk,
+                                                    labels = (1:quant)-0.5,
+                                                    include.lowest = T,
+                                                    right = T)))) %>% 
+  dplyr::right_join(sf::st_drop_geometry(grid))  %>% 
+  tidyr::complete(id, tidyr::nesting(mtype, bandwd), fill=list(range = 0.5)) %>% 
+  dplyr::filter(!is.na(mtype), !is.na(bandwd)) %>% 
+  dplyr::mutate(bandwd = factor(bandwd,
+                                levels = c('500m', '1,500m', '5,000m', '10,000m'))) %>% 
+  dplyr::mutate(bandwd = factor(bandwd,
+                                levels = c('10,000m', '5,000m', '1,500m', '500m'))) %>% 
+  dplyr::group_by(range, bandwd) %>% 
+  dplyr::summarise(ct = dplyr::n()) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(bandwd) %>% 
+  dplyr::mutate(perc = ct/sum(ct, na.rm=T)) %>% 
+  ggplot() + 
+  geom_bar(aes(x = bandwd, y = perc, fill = range), position = 'stack', stat = 'identity')+
+  scale_fill_stepsn('local isolation (quantile)',
+                    colors = colOrange(quant),
+                    values = scales::rescale((1:quant)-.5, 
+                                             from = c(0,quant)),
+                    breaks = 0:quant,
+                    labels = c(expression(''%<-%''), rep('',quant-1), expression(''%->%'')),
+                    limits = c(0,quant),
+                    na.value=colOrange(quant),
+                    guide = guide_colorbar(order = 2,
+                                           nbin = 200,
+                                           title.position = "top",
+                                           label.position = "bottom",
+                                           barheight = base/45*.7,
+                                           barwidth = base/3*.7,
+                                           default.unit = "mm",
+                                           ticks.colour = NA,
+                                           override.aes = list(shape = NA,
+                                                               linetype = "blank")),
+                    aesthetics = "fill") +
+  scale_y_continuous(labels = scales::percent, breaks = seq(0,1,.2))+
+  coord_flip(expand = F) +
+  labs(y= 'percentage', x = 'bandwidth') +
+  theme_chart +
+  theme(plot.margin = margin(2,7.5,2,2,'mm'))
+
+p
+}
+```
+
+
+# Figure 03 - barplot segregation
+```{r}
+# fig 03 - barplot segregation ----
+p <- fig03('G3_G3')
+
+size <- dplyr::filter(map_dim, map=='chart')
+ggsave(paste0('latex/scs_zeis/figure/design/barplot_segreg2.png'), 
+       p, dpi = 500, width = size$width, height = size$height, 
+       units = "mm", type = 'cairo-png')
+
+p
+```
+```{r creating breaks}
+acc_div_eq <- seq(0,max(df$acc, na.rm=T),length.out = 4)
+acc_div_qt <- quantile(x = df$acc, probs = seq(0,1,length.out = 4), 
+                    names = F, na.rm = T)
+
+seg_div_eq <- seq(0,max(df$acc, na.rm=T),length.out = 4)
+seg_div_qt <- quantile(x = df$seg, probs = seq(0,1,length.out = 4), 
+                     names = F, na.rm = T)
+```
+
+# First option - quantiles for both
+
+```{r}
+acc_div <- acc_div_qt
+seg_div <- seg_div_qt
+```
+
+## Figure 4 - bivariate map
+
+```{r classes}
+df <- df %>%
+  dplyr::mutate(seg = ifelse(is.na(seg), 0, seg),
+                acc = ifelse(is.na(acc), 0, acc),
+                range_acc = as.numeric(cut(acc,
+                                           breaks = acc_div,
+                                           labels = 1:3,
+                                           include.lowest = T,
+                                           right = F)),
+                range_seg = as.numeric(cut(seg,
+                                           breaks = seg_div,
+                                           labels = 1:3,
+                                           include.lowest = T,
+                                           right = F)),
+                acc_seg = as.numeric(paste0(range_acc, range_seg))) 
+
+# number and percent of cells in each class
+summary_cells <- df %>% 
+  dplyr::group_by(acc_seg) %>% 
+  dplyr::summarise(n = dplyr::n()) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::mutate(perc = n/sum(n, na.rm=T)) %>% 
+  print()
+```
+
+```{r preparation for the map}
+# * bivariate maps ----
+
+# colors of accessibility and segregation
+col_acc <- unname(colBivariate[1:3])
+col_segreg <- unname(colBivariate[seq(1,9,3)])
+
+# dissolve 
+plot <- df %>% 
+  dplyr::filter(!is.na(acc), !is.na(seg)) %>% 
+  dplyr::select(-acc, -seg) %>% 
+  tidyr::pivot_longer(c(acc_seg,range_seg, range_acc), 
+                      names_to = 'plot', 
+                      values_to = 'value') %>% 
+  dplyr::mutate(plot = factor(plot,
+                              levels = c('range_acc', 'range_seg', 'acc_seg'),
+                              labels = c('accessibility', 'segregation', 'bivariate'))) %>% 
+  dplyr::right_join(grid) %>% 
+  sf::st_as_sf() %>% 
+  dplyr::group_by(plot, value) %>% 
+  dplyr::summarise() %>% 
+  dplyr::ungroup() %>% 
+  dplyr::filter(!is.na(plot)) %>% 
+  dplyr::mutate(value = as.numeric(value))
+
+# accessibility filter
+acc_plot <- dplyr::filter(plot, plot == 'accessibility') %>% 
+  dplyr::mutate(value = value-.5)
+
+# segregation filter
+seg_plot <- dplyr::filter(plot, plot == 'segregation') %>% 
+  dplyr::mutate(value = value-.5)
+
+# bivariate filter
+bi_plot <- dplyr::filter(plot, plot == 'bivariate')
+```
+
+```{r bivariate map}
+# maps
+p <- ggplot() +
+  annotation_custom(ggbasemap, xmin=-Inf, xmax = Inf, ymin = -Inf, ymax = Inf) +
+  # accessibility map
+  geom_sf(data = acc_plot, aes(fill = value), color = NA) +
+  scale_fill_stepsn(name = '% of total jobs',
+                    colors = col_acc,
+                    values = scales::rescale((1:3)-.5, 
+                                             from = c(0,3)),
+                    breaks = 0:3,
+                    labels = scales::percent(acc_div, accuracy = 1),
+                    limits = c(0, 3),
+                    expand = F,
+                    right = T,
+                    guide = guide_colorsteps(order = 2,
+                                             even.steps = F,
+                                             title.position = "top",
+                                             barheight = base/45,
+                                             barwidth = base/3,
+                                             default.unit = "mm",
+                                             ticks.colour = NA,
+                                             override.aes = list(shape = NA,
+                                                                 linetype = "blank"))) +
+  # segregation map
+  new_scale_fill() +
+  geom_sf(data = seg_plot, aes(fill = value), color = NA) +
+  scale_fill_stepsn(name = 'local isolation high class',
+                    colors = col_segreg,
+                    breaks = 0:3,
+                    values = scales::rescale((1:3)-.5, 
+                                             from = c(0,3)),
+                    labels = scales::scientific(round(seg_div,6), digits = 1),
+                    limits = c(0,3),
+                    expand = F,
+                    right = T,
+                    guide = guide_colorsteps(order = 3,
+                                             even.steps = F,
+                                             title.position = "top",
+                                             barheight = base/45,
+                                             barwidth = base/3,
+                                             default.unit = "mm",
+                                             ticks.colour = NA,
+                                             override.aes = list(shape = NA,
+                                                                 linetype = "blank"))) +
+  # bivariate plot
+  new_scale_fill() +
+  geom_sf(data = bi_plot, aes(fill = as.character(value)), color = NA, show.legend = F) +
+  scale_fill_manual(values = colBivariate,
+                    guide = guide_legend(order = 3,
+                                         nbin = 200,
+                                         title.position = "top",
+                                         label.position = "bottom",
+                                         barheight = base/45,
+                                         barwidth = base/3,
+                                         default.unit = "mm",
+                                         ticks.colour = NA,
+                                         override.aes = list(shape = NA,
+                                                             linetype = "blank")),
+                    aesthetics = "fill") +
+  geom_sf(data = massa, fill = colWater, color = colWater, size = line.size/500)  +
+  geom_sf(data=rios, color=colWater, size=line.size/250) + 
+  geom_sf(data=verde, fill=colGreen, color="transparent") +
+  geom_sf(data=trilhos, aes(color = "trilhos"),
+          size = line.size/200, show.legend = F) +
+  geom_sf(data=muni, fill = 'grey40', color = 'transparent', alpha = 0.25) +
+  scale_color_manual(breaks = "trilhos",
+                     values = c("trilhos" = "grey40"),
+                     guide = guide_legend(title= "", 
+                                          order = 1,
+                                          title.position = "top")) +
+  ggspatial::annotation_scale(location = 'br', 
+                              bar_cols = c('grey15', 'grey99'), 
+                              line_width = 0.3,
+                              line_col = 'grey15',
+                              text_col = 'grey15') +
+  labs(caption = paste0(bg$caption))+
+  facet_grid(.~plot)+
+  theme_bw() +
+  theme_map_3 +
+  coord_lim 
+
+```
+
+```{r legend}
+# * legends ----
+legend_bi <- df %>% 
+  ggplot() +
+  geom_rect(aes(xmin = acc_div[1], ymin = seg_div[1], xmax = acc_div[2], ymax = seg_div[2]), fill = colBivariate['11'])+
+  geom_rect(aes(xmin = acc_div[2], ymin = seg_div[1], xmax = acc_div[3], ymax = seg_div[2]), fill = colBivariate['21'])+
+  geom_rect(aes(xmin = acc_div[3], ymin = seg_div[1], xmax = acc_div[4], ymax = seg_div[2]), fill = colBivariate['31'])+
+  geom_rect(aes(xmin = acc_div[1], ymin = seg_div[2], xmax = acc_div[2], ymax = seg_div[3]), fill = colBivariate['12'])+
+  geom_rect(aes(xmin = acc_div[2], ymin = seg_div[2], xmax = acc_div[3], ymax = seg_div[3]), fill = colBivariate['22'])+
+  geom_rect(aes(xmin = acc_div[3], ymin = seg_div[2], xmax = acc_div[4], ymax = seg_div[3]), fill = colBivariate['32'])+
+  geom_rect(aes(xmin = acc_div[1], ymin = seg_div[3], xmax = acc_div[2], ymax = seg_div[4]), fill = colBivariate['13'])+
+  geom_rect(aes(xmin = acc_div[2], ymin = seg_div[3], xmax = acc_div[3], ymax = seg_div[4]), fill = colBivariate['23'])+
+  geom_rect(aes(xmin = acc_div[3], ymin = seg_div[3], xmax = acc_div[4], ymax = seg_div[4]), fill = colBivariate['33'])+
+  geom_point(aes(x=acc, y = seg), color = 'white', alpha = 0.02, size = 0.01) +
+  scale_y_continuous(breaks = seg_div, 
+                     trans = scales::pseudo_log_trans(10^-8, base=10),
+                     labels = scales::scientific(round(seg_div,6), digits = 1)) +
+  scale_x_continuous(breaks = acc_div, 
+                     trans = scales::pseudo_log_trans(10^-2, base=10),
+                     labels = scales::percent(acc_div, accuracy = 1)) +
+  coord_flip(expand = F) +
+  labs(x = "> accessibility",
+       y = "> segregation") +
+  theme_chart +
+  theme(axis.line = element_blank(),
+        plot.background = element_blank(),
+        panel.border = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_text(size = font.size*0.08))
+```
+
+```{r final map}
+size <- dplyr::filter(map_dim, map=='4')
+p2 <- ggdraw(p) +
+  draw_plot(legend_bi, 
+            x = 1-27/size$width, y = 38/size$height, 
+            width = 27/size$width, height = 27/size$height, hjust = 1) 
+
+ggsave('latex/scs_zeis/figure/results/map_bivariate2.png', 
+       p2, dpi = 500, width = size$width, height = size$height, units = "mm", type='cairo-png')
+
+p2
+```
+
+```{r Morans I}
+
+moran_aux <- df %>%
+  dplyr::select(id, acc, seg) %>%
+  dplyr::right_join(grid) %>%
+  sf::st_as_sf() %>%
+  dplyr::mutate(seg = ifelse(is.na(seg), 0, seg),
+                acc = ifelse(is.na(acc), 0, acc))
+
+moran <- accSeg:::globalMoran(moran_aux)
+# moran_sim <- ecdf(accSeg:::globalMoranSim(moran_aux))
+# moran_sim(moran)
+moran
+```
+
+```{r LISA}
+# lisa_shp <- accSeg:::LISAmaps(moran_aux)
+# 
+# rgdal::writeOGR(sf::as_Spatial(sf::st_as_sf(lisa_shp)),
+#  'results/02_housing_acc_segreg/lisa.shp', layer = 'lisa',
+#  driver = 'ESRI Shapefile')
+```
+
