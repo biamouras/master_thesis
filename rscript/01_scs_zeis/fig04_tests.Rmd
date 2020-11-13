@@ -36,7 +36,8 @@ segreg <- lSeg %>%
 
 df <- dplyr::full_join(acc, segreg) %>% 
   dplyr::mutate(acc = ifelse(is.na(acc), 0, acc),
-                seg = ifelse(is.na(seg), 0, seg))
+                seg = ifelse(is.na(seg), 0, seg),
+                seg2 = seg/max(seg))
 
 # housing 
 housing <- sf::read_sf('data/housing/private/private_scs_paper.shp', 
@@ -148,7 +149,6 @@ p
 
 # Figure 03 - barplot segregation
 ```{r}
-# fig 03 - barplot segregation ----
 p <- fig03('G3_G3')
 
 size <- dplyr::filter(map_dim, map=='chart')
@@ -163,7 +163,7 @@ acc_div_eq <- seq(0,max(df$acc, na.rm=T),length.out = 4)
 acc_div_qt <- quantile(x = df$acc, probs = seq(0,1,length.out = 4), 
                     names = F, na.rm = T)
 
-seg_div_eq <- seq(0,max(df$acc, na.rm=T),length.out = 4)
+seg_div_eq <- seq(0,max(df$seg2, na.rm=T),length.out = 4)
 seg_div_qt <- quantile(x = df$seg, probs = seq(0,1,length.out = 4), 
                      names = F, na.rm = T)
 ```
@@ -368,6 +368,7 @@ ggsave('latex/scs_zeis/figure/results/map_bivariate2.png',
 p2
 ```
 
+# Moran's I
 ```{r Morans I}
 moran_aux <- df %>%
   dplyr::select(id, acc, seg) %>%
@@ -381,12 +382,174 @@ moran <- accSeg:::globalMoran(moran_aux)
 # moran_sim(moran)
 moran
 ```
+# Figure 5 - LISA maps
+```{r LISA prep}
+# lisa_shp <- accSeg:::LISAmaps(moran_aux)
+# 
+# rgdal::writeOGR(sf::as_Spatial(lisa_shp),
+#  dsn = '../../results/02_housing_acc_segreg/lisa2.shp', layer = 'lisa',
+#  driver = 'ESRI Shapefile')
+```
 
-```{r LISA}
-lisa_shp <- accSeg:::LISAmaps(moran_aux)
+```{r}
+lisa_shp <- sf::st_read('results/02_housing_acc_segreg/lisa2.shp', quiet=T) %>% 
+  sf::st_transform(prjdegrees) %>% 
+  dplyr::rename(agrupamento = patterns,
+                `significância` = pvalue) %>% 
+  dplyr::select(id, agrupamento, `significância`) %>% 
+  tidyr::pivot_longer(c(agrupamento, `significância`), names_to = 'var', values_to = 'value') %>% 
+  sf::st_as_sf() %>% 
+  dplyr::group_by(var, value) %>% 
+  dplyr::summarise() %>% 
+  dplyr::ungroup() %>% 
+  dplyr::filter(!is.na(value)) %>% 
+  dplyr::mutate(var = ifelse(var == 'agrupamento', 'cluster', 'significance'))
 
-rgdal::writeOGR(sf::as_Spatial(sf::st_as_sf(lisa_shp)),
- 'results/02_housing_acc_segreg/lisa.shp', layer = 'lisa',
- driver = 'ESRI Shapefile')
+cluster_p <- dplyr::filter(lisa_shp, var == 'cluster')
+pvalue_p <- dplyr::filter(lisa_shp, var == 'significance')
+
+p <- lisa_shp %>% 
+  ggplot() +
+  annotation_custom(ggbasemap, xmin=-Inf, xmax = Inf, ymin = -Inf, ymax = Inf) +
+  geom_sf(data = cluster_p, aes(fill = value), color = NA) +
+  scale_fill_manual(name = 'cluster',
+                    breaks = c('High - High',
+                               'High - Low',
+                               'Not significant',
+                               'Low - High',
+                               'Low - Low'),
+                    values = c('High - High' = colRedBlue(5)[1],
+                               'High - Low' = colRedBlue(5)[2],
+                               'Not significant' = colRedBlue(5)[3],
+                               'Low - High' = colRedBlue(5)[4],
+                               'Low - Low' = colRedBlue(5)[5]),
+                    guide = guide_legend(order = 2,
+                                         nrow = 1,
+                                         title.position = "top",
+                                         label.position = "bottom",
+                                         barheight = base/45,
+                                         barwidth = base/3,
+                                         default.unit = "mm",
+                                         override.aes = list(shape = NA,
+                                                             linetype = "blank",
+                                                             fill = colRedBlue(5)))) +
+  new_scale_fill() +
+  geom_sf(data = pvalue_p, aes(fill = value), color = NA) +
+  scale_fill_manual(name = 'significance',
+                    limits = c('p = 0.001',
+                               'p = 0.01',
+                               'p = 0.05',
+                               'Not significant'),
+                    values = c('p = 0.001' = colOrange(5)[3],
+                               'p = 0.01' = colOrange(5)[2],
+                               'p = 0.05' = colOrange(5)[1],
+                               'Not significant' = colRedBlue(5)[3]),
+                    guide = guide_legend(order = 3,
+                                         nrow = 1,
+                                         title.position = "top",
+                                         label.position = "bottom",
+                                         barheight = base/45,
+                                         barwidth = base/3,
+                                         default.unit = "mm",
+                                         override.aes = list(shape = NA,
+                                                             linetype = "blank"))) +
+  geom_sf(data = massa, fill = colWater, color = colWater, size = line.size/500)  +
+  geom_sf(data=rios, color=colWater, size=line.size/250) + 
+  geom_sf(data=verde, fill=colGreen, color="transparent") +
+  geom_sf(data=muni, fill = 'grey40', color = 'transparent', alpha = 0.25) +
+  geom_sf(data=trilhos, aes(color = "rails"),
+          size = line.size/200, show.legend = "line") +
+  labs(caption = bg$caption) +
+  scale_color_manual(breaks = "rails",
+                     values = c("rails" = "grey40"),
+                     guide = guide_legend(title= "", 
+                                          order = 1,
+                                          title.position = "top")) +
+  ggspatial::annotation_scale(location = 'br', 
+                              bar_cols = c('grey15', 'grey99'), 
+                              line_width = 0.3,
+                              line_col = 'grey15',
+                              text_col = 'grey15') +
+  facet_grid(~var) +
+  theme_bw() +
+  theme_map_2 +
+  theme(legend.spacing.x = unit(.1,'cm')) +
+  coord_lim 
+
+size <- dplyr::filter(map_dim, map=='4')
+ggsave(paste0('latex/scs_zeis/figure/results/map_lisa_acc_segreg2.png'),
+       p, dpi = 500, width = size$width, height = size$height, units = "mm", type = 'cairo-png')
+p
+```
+
+# numeric analysis for housing location
+```{r}
+hs_df <- housing %>%
+  dplyr::left_join(df, by = c('id_grid' = 'id')) %>% 
+  mutate(db = factor(db,
+                     levels = c('regular real estate', 'mcmv')))
+
+summary_mcmv <- hs_df %>% 
+  sf::st_drop_geometry() %>% 
+  dplyr::group_by(class, acc_seg) %>% 
+  dplyr::summarise(n = dplyr::n()) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(class) %>% 
+  dplyr::mutate(perc = n/sum(n, na.rm=T)) %>% 
+  dplyr::filter(perc == max(perc)) %>% 
+  print()
+
+summary_mcmv <- hs_df %>% 
+  sf::st_drop_geometry() %>% 
+  dplyr::group_by(class, range_acc) %>% 
+  dplyr::summarise(n = dplyr::n()) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(class) %>% 
+  dplyr::mutate(perc = n/sum(n, na.rm=T)) %>% 
+  print()
+
+
+summary_mcmv <- hs_df %>% 
+  sf::st_drop_geometry() %>% 
+  dplyr::group_by(class, range_seg) %>% 
+  dplyr::summarise(n = dplyr::n()) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(class) %>% 
+  dplyr::mutate(perc = n/sum(n, na.rm=T)) %>% 
+  print()
+```
+
+
+# Figure 7 - scatter plot
+```{r scatter plot}
+p <- hs_df %>% 
+  ggplot() +
+  geom_point(data=df, aes(acc, seg), alpha = 0.08, color = 'grey90') +
+  geom_point(aes(acc, seg, size = uh), color = colRedBlue(3)[3],alpha = 0.15) +
+  scale_size(range = c(0,10)) +
+  scale_y_continuous(breaks = seg_div, 
+                     trans = scales::pseudo_log_trans(10^-08, base=10),
+                     labels = scales::scientific(round(seg_div,6), digits = 1)) +
+  scale_x_continuous(breaks = acc_div, 
+                     labels = scales::percent_format(accuracy = 1),
+                     trans = scales::pseudo_log_trans(10^-02, base=10)) +
+  guides(size = guide_legend('HU',
+                             title.position = 'top',
+                             order = 2)) +
+  coord_flip(expand = F, xlim = c(0,.8)) +
+  labs(y = 'high class isolation', 
+       x = 'accessibility (% of total of jobs)',
+       caption = 'Pre - PMCMV: 2002-2008; Post - PMCMV: 2009-2014') +
+  ggh4x::facet_nested(class~period+db)+
+  theme_chart +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.spacing.x = unit(10,'mm'),
+        panel.spacing.y = unit(4,'mm'),
+        plot.caption.position = 'plot')
+
+size <- dplyr::filter(map_dim, map=='chart')
+ggsave(paste0('latex/scs_zeis/figure/results/scatterplot_housing_acc_seg2.png'),
+       plot = p, dpi = 500, width = size$width, height = size$width, units = "mm", type = 'cairo-png')
+p
 ```
 
