@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'G:/Meu Drive/beatriz.moura@usp.br 2020-10-13 08 24/Projects/Master')
+knitr::opts_knit$set(root.dir = 'G:/Meu Drive/beatriz.moura@usp.br 2020-10-13 08 24/Projects/master_thesis')
 base <- 210 # width of images
 quant <- 5
 ```
@@ -369,7 +369,6 @@ p2
 ```
 
 ```{r Morans I}
-
 moran_aux <- df %>%
   dplyr::select(id, acc, seg) %>%
   dplyr::right_join(grid) %>%
@@ -384,10 +383,10 @@ moran
 ```
 
 ```{r LISA}
-# lisa_shp <- accSeg:::LISAmaps(moran_aux)
-# 
-# rgdal::writeOGR(sf::as_Spatial(sf::st_as_sf(lisa_shp)),
-#  'results/02_housing_acc_segreg/lisa.shp', layer = 'lisa',
-#  driver = 'ESRI Shapefile')
+lisa_shp <- accSeg:::LISAmaps(moran_aux)
+
+rgdal::writeOGR(sf::as_Spatial(sf::st_as_sf(lisa_shp)),
+ 'results/02_housing_acc_segreg/lisa.shp', layer = 'lisa',
+ driver = 'ESRI Shapefile')
 ```
 
