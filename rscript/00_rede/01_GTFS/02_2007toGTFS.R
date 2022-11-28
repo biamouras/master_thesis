@@ -21,6 +21,7 @@ year <- 2007
 # arquivos do ano de referência
 dir_new <- file.path(dir_origin, "data/Nova", year)
 dir_results  <-  file.path(dir_origin, "results", year)
+dir.create(dir_results, showWarnings = F)
 
 # trilhos ids que estavam operando
 trilhos_ids <- read_csv(paste0(dir_new, '/trilhos_id_', year, '.csv'))$trip_id
@@ -44,7 +45,7 @@ freq_head <- names(frequencies)
 freq_new <- edital %>%
     mutate(start_time = '07:00:00',
            end_time = '07:59:00') %>%
-    dplyr::select(freq_head) %>%
+    select(all_of(freq_head)) %>%
     filter(trip_id %in% trip_ids$trip_id)
 
 # seleciona apenas os trilhos que operavam em 2003 
@@ -59,6 +60,9 @@ freq_newTrilhos <- rbind(freq_new, freq_trilhos) %>%
 # exportando arquivo
 write.csv(freq_newTrilhos, file.path(dir_results,"frequencies.txt"), row.names = F)
 
+rm(freq_head, freq_new, freq_trilhos, freq_newTrilhos, frequencies)
+gc()
+
 # ROUTES    ----
 
 routes_head <- names(routes)
@@ -72,7 +76,7 @@ routes_new <- edital %>%
            route_long_name = Nome)  %>%
     distinct(route_id, agency_id, route_short_name, route_long_name, 
              route_color, route_type) %>%
-    dplyr::select(routes_head) %>%
+    dplyr::select(all_of(routes_head)) %>%
     filter(route_id %in% trip_ids$Codigo)
 
 routes_trilhos <- routes %>%
@@ -83,6 +87,9 @@ routes_newTrilhos <- dplyr::bind_rows(routes_new, routes_trilhos)
 
 # exportando arquivo
 write.csv(routes_newTrilhos, file.path(dir_results,"routes.txt"), row.names = F)
+
+rm(routes, routes_head, routes_new, routes_newTrilhos)
+gc()
 
 # FARE RULES    ----
 fare_new <- edital %>% 
@@ -126,6 +133,9 @@ fare_newTrilhos <- dplyr::bind_rows(fare_new, fare_trilhos)
 # exportando arquivo
 write.csv(fare_newTrilhos, file.path(dir_results,"fare_rules.txt"), row.names = F)
 
+rm(routes_trilhos, fare_rules, fare_new, fare_trilhos, fare_newTrilhos)
+gc()
+
 # TRIPS ----
 
 trips_head <- names(trips)
@@ -146,6 +156,9 @@ trips_newTrilhos <- dplyr::bind_rows(trips_new, trips_trilhos)
 # exportando arquivo
 write.csv(trips_newTrilhos, file.path(dir_results,"trips.txt"), row.names = F)
 
+rm(trips, trips_head, trips_new, trips_newTrilhos)
+gc()
+
 # SHAPES    ----
 
 shapes_head <- names(shapes)
@@ -160,7 +173,7 @@ shapes_new <- new_chainage %>%
     mutate(shape_pt_sequence = 1:n()) %>%
     ungroup() %>%
     arrange(shape_id, distance) %>% 
-    dplyr::select(shapes_head)
+    dplyr::select(all_of(shapes_head))
 
 shapes_trilhos <- shapes %>%
     filter(shape_id %in% trips_trilhos$shape_id)
@@ -169,6 +182,9 @@ shapes_newTrilhos <- dplyr::bind_rows(shapes_new, shapes_trilhos)
 
 # exportando arquivo
 write.csv(shapes_newTrilhos, file.path(dir_results,"shapes.txt"), row.names = F)
+
+rm(shapes, shapes_head, shapes_trilhos, shapes_newTrilhos)
+gc()
 
 # STOPS ----
 
@@ -201,6 +217,9 @@ stops_newTrilhos <- dplyr::bind_rows(stops_new, stops_trilhos)
 
 # exportando arquivo
 write.csv(stops_newTrilhos, file.path(dir_results,"stops.txt"), row.names = F)
+
+rm(stops, stops_head, stops_unique, stops_new, stops_newTrilhos)
+gc()
 
 # STOP TIMES ----
 
