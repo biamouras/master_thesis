@@ -45,4 +45,5 @@ new_chainage <-  new_chainage %>%
     dplyr::select(trip_id, Codigo, Sentido, shape_id, distance, X, Y) %>% 
     arrange(shape_id, distance) %>% 
     unique(.)
-save(new_chainage, file = "rdata/new_chainage.rda")
+
+save(new_chainage, file = "rdata/2007/new_chainage.rda")
