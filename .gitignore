@@ -1,3 +1,5 @@
 /data/*
 /rscript/00_rede/01_GTFS/data
 /rscript/00_rede/01_GTFS/rdata
+/rscript/00_rede/01_GTFS/results
+/results/*
