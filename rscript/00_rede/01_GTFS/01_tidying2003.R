@@ -75,7 +75,8 @@ edital <- ref %>%
     dplyr::select(trip_id, COD_LINHA, SENTIDO, route_long_name, trip_headsign, 
                   vel_U, fid) %>%
     mutate(vel_U = if_else(is.infinite(vel_U), mean$mean, vel_U)) %>% 
-    rename(Codigo = COD_LINHA)
+    rename(Codigo = COD_LINHA,
+           Sentido = SENTIDO)
 
 dir.create(paste0(dir_origin, '/rdata/2003'), showWarnings = F)
 save(edital, file=paste0(dir_origin, '/rdata/2003/edital.rda'))
