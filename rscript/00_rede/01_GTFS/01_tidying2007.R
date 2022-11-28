@@ -31,13 +31,13 @@ mean_vel <- edital %>%
     summarise(mean = mean(vel_u)) %>% 
     .$mean
 
-
 edital <- edital %>% 
     mutate(vel_u = if_else(is.infinite(vel_u), mean_vel,vel_u)) %>% 
     dplyr::select(trip_id, Codigo, Sentido, Nome, 
                   Integracao, headway_secs, vel_u, shape_id)
 
-save(edital, file="rdata/edital.rda")
+dir.create(paste0(dir_origin, '/rdata/2007'), showWarnings = F)
+save(edital, file=paste0(dir_origin, '/rdata/2007/edital.rda'))
 
 new_chainage <-  new_chainage %>% 
     left_join(edital[,c("trip_id", "shape_id")], by="trip_id") %>% 
