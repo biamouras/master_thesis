@@ -90,3 +90,19 @@ df_amostra_sp <- df_amostra %>%
       labels = c('G1', 'G2', 'G3')
     ))
 
+df_amostra_rest <- df_amostra_sp %>% 
+  pivot_wider(
+    id_cols = c('V0001', 'V0002', 'V0011'),
+    names_from = 'v_restritiva',
+    values_from = 'V0010', # peso
+    values_fn = sum
+  )
+
+df_amostra_alvo <- df_amostra_sp %>% 
+  pivot_wider(
+    id_cols = c('V0001', 'V0002', 'V0011'),
+    names_from = 'v_alvo',
+    values_from = 'V0010', # peso
+    values_fn = sum
+  )
+
