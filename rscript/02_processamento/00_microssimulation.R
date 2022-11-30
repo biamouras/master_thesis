@@ -55,7 +55,7 @@ df_amostra <- vroom::vroom_fwf(
     col_names = dic_amostra$VAR
   ),
   col_select = c('V0001', 'V0002','V0010', 
-                 'V6532', 'V6530')) %>% 
+                 'V0011', 'V6532', 'V6530')) %>% 
   # ajustando casas decimais
   mutate(
     across(
@@ -75,8 +75,18 @@ df_universo <- read_delim(
 # Tratamento dos dados da amostra ----
 
 df_amostra_sp <- df_amostra %>% 
+  # filtra município de São Paulo
   filter(paste0(V0001,V0002) == '3550308') %>% 
-  mutate(v_restritiva = cut(
-    V6532,
-    breaks = c(0, 1/8, 1/4, 1/2, 1, 2, 3, 5, 10, 2000)
-  ))
+  mutate(
+    # 
+    v_restritiva = cut(
+      V6532,
+      breaks = c(-1, 0, 1/8, 1/4, 1/2, 1, 2, 3, 5, 10, 2000),
+      labels = c('V014', paste0('V', str_pad(5:13, 3, pad = '0'))), # mesmos nomes da universo
+    ),
+    v_alvo = cut(
+      V6530,
+      breaks = c(-1, 3, 10, 4000),
+      labels = c('G1', 'G2', 'G3')
+    ))
+
