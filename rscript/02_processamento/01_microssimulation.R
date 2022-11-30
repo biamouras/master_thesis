@@ -72,6 +72,10 @@ df_universo <- read_delim(
   na = 'X'
 )
 
+## relação entre setores censitários e áreas de ponderação ----
+# relação produzida com xxxxx
+
+
 # Tratamento dos dados da amostra ----
 
 df_amostra_sp <- df_amostra %>% 
@@ -92,7 +96,7 @@ df_amostra_sp <- df_amostra %>%
 
 df_amostra_rest <- df_amostra_sp %>% 
   pivot_wider(
-    id_cols = c('V0001', 'V0002', 'V0011'),
+    id_cols = 'V0011',
     names_from = 'v_restritiva',
     values_from = 'V0010', # peso
     values_fn = sum
@@ -100,9 +104,17 @@ df_amostra_rest <- df_amostra_sp %>%
 
 df_amostra_alvo <- df_amostra_sp %>% 
   pivot_wider(
-    id_cols = c('V0001', 'V0002', 'V0011'),
+    id_cols = 'V0011',
     names_from = 'v_alvo',
     values_from = 'V0010', # peso
     values_fn = sum
   )
 
+# Tratamento dos dados do universo ----
+df_universo_rest <- df_universo %>% 
+  select(
+    all_of(c(
+      'Cod_setor',
+      'V014', 
+      paste0('V', str_pad(5:13, 3, pad = '0'))
+      )))
