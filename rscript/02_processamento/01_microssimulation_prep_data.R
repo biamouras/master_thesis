@@ -83,6 +83,8 @@ relacao_areap_setor <- read_tsv(
 
 # Tratamento dos dados da amostra ----
 
+var_restritivas <- c('V014', paste0('V', str_pad(5:13, 3, pad = '0')))
+
 df_amostra_sp <- df_amostra %>% 
   # filtra município de São Paulo
   # filtra domicílios que não responderam a renda
@@ -93,7 +95,7 @@ df_amostra_sp <- df_amostra %>%
     v_restritiva = cut(
       V6532,
       breaks = c(-1, 0, 1/8, 1/4, 1/2, 1, 2, 3, 5, 10, 2000),
-      labels = c('V014', paste0('V', str_pad(5:13, 3, pad = '0'))), 
+      labels = var_restritivas, 
     ),
     # variavel de interesse da microssimulação
     # renda domiciliar bruta em salários mínimos
@@ -145,28 +147,27 @@ universo_ap <- df_universo_rest %>%
 
 # seleciona os indivíduos da AP
 amostra_ap <- df_amostra_sp %>% 
-  filter(V0011 == ap) %>% 
-  select(v_restritiva)
-
-# matriz inicial para cada zona
-weight_init <- table(amostra_ap)
-
-# agrega as matrizes n zonas vezes
-init_cells <- rep(weight_init, each = nrow(universo_ap))
-
-# define os nomes
-names <- c(
-  list(rownames(universo_ap)),
-  as.list(dimnames(weight_init))
-)
+  filter(V0011 == ap) 
 
 ## estrutura os dados de entrada ----
-weight_init <- array(
-  init_cells, 
-  dim = c(nrow(universo_ap), dim(weight_init)),
-  dimnames = names
-)
 
+weight_init <-  amostra_ap %>% 
+  # matriz inicial para cada zona
+  pivot_wider(
+    id_cols = 'V0011',
+    names_from = 'v_restritiva',
+    values_from = 'V0010', # considera o peso
+    values_fn = sum
+  ) %>% 
+  select(-V0011, ) %>% 
+  # agrega as matrizes n zonas vezes
+  slice(rep(1, each = length(setores))) %>% 
+  as.matrix(.)
+
+# define os nomes
+rownames(weight_init) <- setores
+
+# alvo de valores totais de cada setor
 target <- list(
   as.matrix(universo_ap)
 )
