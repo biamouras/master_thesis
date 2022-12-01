@@ -208,3 +208,9 @@ weight_init <- lapply(amostra_weight, FUN = function(x){
   x <- x[,var_restritivas]
 })
 
+# transforma em matriz
+weight_init <- matrix(
+  unlist(weight_init), 
+  ncol = 10, 
+  byrow = T,
+  dimnames = list(setores, var_restritivas))
