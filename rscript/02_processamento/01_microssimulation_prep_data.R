@@ -159,7 +159,7 @@ weight_init <-  amostra_ap %>%
     values_from = 'V0010', # considera o peso
     values_fn = sum
   ) %>% 
-  select(-V0011, ) %>% 
+  select(-V0011) %>% 
   # agrega as matrizes n zonas vezes
   slice(rep(1, each = length(setores))) %>% 
   as.matrix(.)
@@ -167,12 +167,44 @@ weight_init <-  amostra_ap %>%
 # define os nomes
 rownames(weight_init) <- setores
 
-# alvo de valores totais de cada setor
-target <- list(
-  as.matrix(universo_ap)
-)
+# reordena as colunas
+weight_init <- weight_init[, var_restritivas]
 
+# alvo de valores totais de cada setor
+target <- as.matrix(universo_ap)
+
+# ordem das variáveis restritivas
 descript <- list(1:10)
 
-weight_mipfp <- Ipfp(weight_init, descript, target,
-                     na.target = T, tol = 1e-5)
+## implementação do Ipf ----
+#weight_mipfp <- Ipfp(weight_init, descript, target,
+#                     na.target = T, tol = 1e-5)
+
+# obtem a ponderação de cada zona para aplicar sobre o 
+# cada indivíduo que se encaixa em determinada categoria
+weight_int <- t(apply(target, MARGIN = 1, function(x) x/colSums(weight_init)))
+
+# multiplica os pesos intermediarios cada peso inicial de cada indivíduo, 
+# para cada setor
+amostra_weight <- apply(weight_int, MARGIN = 1, function(x){
+  amostra_ap %>% 
+    mutate(V0010 = V0010 * x[v_restritiva])
+})
+
+# soma os pesos novamente (margens)
+weight_init <- lapply(amostra_weight, FUN = function(x){
+  x <- x %>% 
+    # matriz inicial para cada zona
+    pivot_wider(
+      id_cols = 'V0011',
+      names_from = 'v_restritiva',
+      values_from = 'V0010', # considera o peso
+      values_fn = sum
+    ) %>% 
+    select(-V0011) %>% 
+    as.matrix(.)
+  
+  # retorna na ordem original
+  x <- x[,var_restritivas]
+})
+
