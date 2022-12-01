@@ -102,22 +102,22 @@ df_amostra_sp <- df_amostra %>%
       breaks = c(-1, 3, 10, 4000),
       labels = c('G1', 'G2', 'G3')
     ))
-
-df_amostra_rest <- df_amostra_sp %>% 
-  pivot_wider(
-    id_cols = 'V0011',
-    names_from = 'v_restritiva',
-    values_from = 'V0010', # peso
-    values_fn = sum
-  )
-
-df_amostra_alvo <- df_amostra_sp %>% 
-  pivot_wider(
-    id_cols = 'V0011',
-    names_from = 'v_alvo',
-    values_from = 'V0010', # peso
-    values_fn = sum
-  )
+# 
+# df_amostra_rest <- df_amostra_sp %>% 
+#   pivot_wider(
+#     id_cols = 'V0011',
+#     names_from = 'v_restritiva',
+#     values_from = 'V0010', # peso
+#     values_fn = sum
+#   )
+# 
+# df_amostra_alvo <- df_amostra_sp %>% 
+#   pivot_wider(
+#     id_cols = 'V0011',
+#     names_from = 'v_alvo',
+#     values_from = 'V0010', # peso
+#     values_fn = sum
+#   )
 
 # Tratamento dos dados do universo ----
 
@@ -146,7 +146,7 @@ universo_ap <- df_universo_rest %>%
 # seleciona os indivíduos da AP
 amostra_ap <- df_amostra_sp %>% 
   filter(V0011 == ap) %>% 
-  select(v_restritiva, v_alvo)
+  select(v_restritiva)
 
 # matriz inicial para cada zona
 weight_init <- table(amostra_ap)
