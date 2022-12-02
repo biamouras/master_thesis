@@ -1,10 +1,9 @@
-"""
-Replicação do processamento de microssimulação espacial feito para a dissertação
+# Replicação do processamento de microssimulação espacial feito para a dissertação
+# 
+# Objetivo é de gerar uma população sintética de domicílios 
+# dividida entre grupos de renda familiar bruta
+# distribuída espacialmente em setores censitários
 
-Objetivo é de gerar uma população sintética de domicílios 
-dividida entre grupos de renda familiar bruta
-distribuída espacialmente em setores censitários
-"""
 
 # Bibliotecas ----
 library(tidyverse)
