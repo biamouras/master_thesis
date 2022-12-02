@@ -104,22 +104,7 @@ df_amostra_sp <- df_amostra %>%
       breaks = c(-1, 3, 10, 4000),
       labels = c('G1', 'G2', 'G3')
     ))
-# 
-# df_amostra_rest <- df_amostra_sp %>% 
-#   pivot_wider(
-#     id_cols = 'V0011',
-#     names_from = 'v_restritiva',
-#     values_from = 'V0010', # peso
-#     values_fn = sum
-#   )
-# 
-# df_amostra_alvo <- df_amostra_sp %>% 
-#   pivot_wider(
-#     id_cols = 'V0011',
-#     names_from = 'v_alvo',
-#     values_from = 'V0010', # peso
-#     values_fn = sum
-#   )
+
 
 # Tratamento dos dados do universo ----
 
@@ -134,53 +119,67 @@ df_universo_rest <- df_universo %>%
   mutate(Cod_setor = rownames(.))
 
 # IPF ----
+areas_ponderacao <- unique(relacao_areap_setor$`Área de ponderação`)
 
-# seleciona os setores de uma AP no universo
-setores <- relacao_areap_setor %>% 
-  filter(`Área de ponderação` == ap) %>% 
-  .$Setor
-
-universo_ap <- df_universo_rest %>% 
-  filter(Cod_setor %in% setores) %>% 
-  select(-Cod_setor)
-
-# seleciona os indivíduos da AP
-amostra_ap <- df_amostra_sp %>% 
-  filter(V0011 == ap) 
-
-## estrutura os dados de entrada ----
-
-weight_init <-  amostra_ap %>% 
-  # matriz inicial para cada zona
-  pivot_wider(
-    id_cols = 'V0011',
-    names_from = 'v_restritiva',
-    values_from = 'V0010', # considera o peso
-    values_fn = sum
-  ) %>% 
-  select(-V0011) %>% 
-  # agrega as matrizes n zonas vezes
-  slice(rep(1, each = length(setores))) %>% 
-  as.matrix(.)
-
-# define os nomes
-rownames(weight_init) <- setores
-
-# reordena as colunas
-weight_init <- weight_init[, var_restritivas]
-
-# alvo de valores totais de cada setor
-target <- list(as.matrix(universo_ap))
-
-# ordem das variáveis restritivas
-descript <- list(1:2)
-
-## implementação do Ipf ----
-weight_mipfp <- Ipfp(seed = weight_init, 
-                     target.list = descript, 
-                     target.data = target,
-                     na.target = T, tol = 1e-5,
-                     print = T)
-
-
+todos_weight <- map(areas_ponderacao, function(ap){
+  message(ap)
+  # seleciona os setores de uma AP no universo
+  setores <- relacao_areap_setor %>% 
+    filter(`Área de ponderação` == ap) %>% 
+    .$Setor
+  
+  universo_ap <- df_universo_rest %>% 
+    filter(Cod_setor %in% setores) %>% 
+    select(-Cod_setor)
+  
+  # seleciona os indivíduos da AP
+  amostra_ap <- df_amostra_sp %>% 
+    filter(V0011 == ap) 
+  
+  ## estrutura os dados de entrada ----
+  
+  weight_init <-  amostra_ap %>% 
+    # matriz inicial para cada zona
+    pivot_wider(
+      id_cols = 'V0011',
+      names_from = 'v_restritiva',
+      values_from = 'V0010', # considera o peso
+      values_fn = sum
+    ) %>% 
+    select(-V0011) %>% 
+    # agrega as matrizes n zonas vezes
+    slice(rep(1, each = length(setores))) %>% 
+    as.matrix(.)
+  
+  # define os nomes
+  rownames(weight_init) <- setores
+  
+  # verifica se tem alguma variável faltando
+  vars_faltando <- var_restritivas[!(var_restritivas %in% colnames(weight_init))]
+  
+  if(!identical(vars_faltando, character(0))){
+    new_cols <- matrix(0, 
+                       nrow = nrow(weight_init), 
+                       ncol = length(vars_faltando),
+                       dimnames = list(setores, vars_faltando))
+    weight_init <- cbind(weight_init, new_cols)
+  }
+  
+  # reordena as colunas
+  weight_init <- weight_init[, var_restritivas]
+  
+  # alvo de valores totais de cada setor
+  target <- list(as.matrix(universo_ap))
+  
+  # ordem das variáveis restritivas
+  descript <- list(1:2)
+  
+  ## implementação do Ipf ----
+  weight_mipfp <- Ipfp(seed = weight_init, 
+                       target.list = descript, 
+                       target.data = target,
+                       na.target = T, tol = 1e-5)
+  
+  weight_mipfp$x.hat
+})
 
