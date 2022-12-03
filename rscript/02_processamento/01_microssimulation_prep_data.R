@@ -10,7 +10,8 @@ library(tidyverse)
 library(sf)
 library(mipfp)
 
-# funções ----
+# funções e configuraçÃo geral  ----
+options(scipen=999)
 
 ajusta_decimal <- function(x){
   # algumas colunas da base da amostra têm casas decimais
@@ -27,6 +28,33 @@ ajusta_decimal <- function(x){
   novo_x <- as.numeric(novo_x)
   
   return(novo_x)
+}
+
+# de https://spatial-microsim-book.robinlovelace.net/smsimr.html#mipfp
+int_trs <- function(x){
+  # For generalisation purpose, x becomes a vector
+  xv <- as.vector(x) # allows trs to work on matrices
+  xint <- floor(xv) # integer part of the weight
+  r <- xv - xint # decimal part of the weight
+  def <- round(sum(r)) # the deficit population
+  # the weights be 'topped up' (+ 1 applied)
+  if(sum(r)>0){
+    topup <- sample(length(x), size = def, prob = r)
+    xint[topup] <- xint[topup] + 1  
+  }
+  dim(xint) <- dim(x)
+  dimnames(xint) <- dimnames(x)
+  xint
+}
+
+int_expand_array <- function(x){
+  # Transform the array into a dataframe
+  count_data <- as.data.frame.table(x)
+  # Store the indices of categories for the final population
+  indices <- rep(1:nrow(count_data), count_data$Freq)
+  # Create the final individuals
+  ind_data <- count_data[indices,]
+  ind_data
 }
 
 # Carregamento de dados ----
@@ -120,7 +148,7 @@ df_universo_rest <- df_universo %>%
 # IPF ----
 areas_ponderacao <- unique(relacao_areap_setor$`Área de ponderação`)
 
-todos_weight <- map(areas_ponderacao, function(ap){
+setor_grupos <- map_df(areas_ponderacao, function(ap){
   message(ap)
   # seleciona os setores de uma AP no universo
   setores <- relacao_areap_setor %>% 
@@ -136,36 +164,12 @@ todos_weight <- map(areas_ponderacao, function(ap){
     filter(V0011 == ap) 
   
   ## estrutura os dados de entrada ----
-  
-  weight_init <-  amostra_ap %>% 
-    # matriz inicial para cada zona
-    pivot_wider(
-      id_cols = 'V0011',
-      names_from = 'v_restritiva',
-      values_from = 'V0010', # considera o peso
-      values_fn = sum
-    ) %>% 
-    select(-V0011) %>% 
-    # agrega as matrizes n zonas vezes
-    slice(rep(1, each = length(setores))) %>% 
-    as.matrix(.)
-  
-  # define os nomes
-  rownames(weight_init) <- setores
-  
-  # verifica se tem alguma variável faltando
-  vars_faltando <- var_restritivas[!(var_restritivas %in% colnames(weight_init))]
-  
-  if(!identical(vars_faltando, character(0))){
-    new_cols <- matrix(0, 
-                       nrow = nrow(weight_init), 
-                       ncol = length(vars_faltando),
-                       dimnames = list(setores, vars_faltando))
-    weight_init <- cbind(weight_init, new_cols)
-  }
-  
-  # reordena as colunas
-  weight_init <- weight_init[, var_restritivas]
+  weight_init <- table(amostra_ap[,c('v_restritiva', 'v_alvo')])
+  weight_zones <- rep(weight_init,
+                     each = length(setores))
+  weight_zones <- array(weight_zones,
+                        dim = c(length(setores), length(var_restritivas), 3),
+                        dimnames = c(list(setores), as.list(dimnames(weight_init))))
   
   # alvo de valores totais de cada setor
   target <- list(as.matrix(universo_ap))
@@ -174,11 +178,40 @@ todos_weight <- map(areas_ponderacao, function(ap){
   descript <- list(1:2)
   
   ## implementação do Ipf ----
-  weight_mipfp <- Ipfp(seed = weight_init, 
+  weight_mipfp <- Ipfp(seed = weight_zones, 
                        target.list = descript, 
                        target.data = target,
                        na.target = T, tol = 1e-5)
+  weight_mipfp <- weight_mipfp$x.hat
   
-  weight_mipfp$x.hat
+  ## inteirização por Truncate, Replicate, Sample ----
+  walk(setores, function(setor){
+    weight_mipfp[as.character(setor),,] <- int_trs(weight_mipfp[as.character(setor),,])
+  })
+  
+  
+  ## expansão e total da variável alvo por setor ----
+  setores_mipfp <- as.data.frame.table(weight_mipfp) %>% 
+    rename(peso = Freq,
+           Cod_setor = Var1) %>% 
+    group_by(Cod_setor, v_alvo) %>% 
+    summarise(total = sum(peso), .groups = 'drop_last') %>% 
+    pivot_wider(
+      id_cols = 'Cod_setor',
+      names_from = 'v_alvo',
+      values_from = 'total',
+      values_fill = 0
+    )
+  
+  setores_mipfp
 })
+
+# total de domicílios
+sum(setor_grupos[,c('G1', 'G2', 'G3')])
+
+# Comparando com a microssimulação do mestrado ----
+
+setor_grupos_mestrado <- read_csv('./data/population/population_micro_censustract.csv')
+sum(setor_grupos_mestrado[,c('G1', 'G2', 'G3')], na.rm= T)
+
 
