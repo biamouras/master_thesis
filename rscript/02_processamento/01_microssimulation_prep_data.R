@@ -143,7 +143,8 @@ df_universo_rest <- df_universo %>%
       paste0('V', str_pad(5:13, 3, pad = '0'))
     ))) %>% 
   column_to_rownames('Cod_setor') %>% 
-  mutate(Cod_setor = rownames(.))
+  mutate(Cod_setor = rownames(.)) %>% 
+  drop_na()
 
 # IPF ----
 areas_ponderacao <- unique(relacao_areap_setor$`Área de ponderação`)
@@ -159,6 +160,9 @@ setor_grupos <- map_df(areas_ponderacao, function(ap){
     filter(Cod_setor %in% setores) %>% 
     select(-Cod_setor)
   
+  # corrige os setores para adequar à mesma quantidade do universo
+  setores <- setores[setores %in% rownames(universo_ap)]
+  
   # seleciona os indivíduos da AP
   amostra_ap <- df_amostra_sp %>% 
     filter(V0011 == ap) 
@@ -172,7 +176,7 @@ setor_grupos <- map_df(areas_ponderacao, function(ap){
                         dimnames = c(list(setores), as.list(dimnames(weight_init))))
   
   # alvo de valores totais de cada setor
-  target <- list(as.matrix(universo_ap))
+  target <- list(as.matrix(universo_ap)) # remove Cod_setor
   
   # ordem das variáveis restritivas
   descript <- list(1:2)
@@ -181,7 +185,7 @@ setor_grupos <- map_df(areas_ponderacao, function(ap){
   weight_mipfp <- Ipfp(seed = weight_zones, 
                        target.list = descript, 
                        target.data = target,
-                       na.target = T, tol = 1e-5)
+                       tol = 1e-5)
   weight_mipfp <- weight_mipfp$x.hat
   
   ## inteirização por Truncate, Replicate, Sample ----
@@ -191,6 +195,10 @@ setor_grupos <- map_df(areas_ponderacao, function(ap){
   
   
   ## expansão e total da variável alvo por setor ----
+  # margens do universo
+  margens_universo <- data.frame(Cod_setor = rownames(universo_ap),
+                                 total_uni = rowSums(universo_ap))
+  
   setores_mipfp <- as.data.frame.table(weight_mipfp) %>% 
     rename(peso = Freq,
            Cod_setor = Var1) %>% 
@@ -201,7 +209,11 @@ setor_grupos <- map_df(areas_ponderacao, function(ap){
       names_from = 'v_alvo',
       values_from = 'total',
       values_fill = 0
-    )
+    ) %>% 
+    ungroup() %>% 
+    mutate(total_sim = G1+G2+G3) %>% 
+    left_join(margens_universo, by = 'Cod_setor') %>% 
+    mutate(erro = total_uni - total_sim)
   
   setores_mipfp
 })
@@ -213,5 +225,3 @@ sum(setor_grupos[,c('G1', 'G2', 'G3')])
 
 setor_grupos_mestrado <- read_csv('./data/population/population_micro_censustract.csv')
 sum(setor_grupos_mestrado[,c('G1', 'G2', 'G3')], na.rm= T)
-
-
