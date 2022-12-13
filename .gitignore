@@ -5,3 +5,4 @@
 /rscript/00_rede/01_GTFS/results
 /rscript/00_rede/01_GTFS/_*
 /rscript/00_rede/01_GTFS/.*
+.Rproj.user
