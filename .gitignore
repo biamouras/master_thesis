@@ -5,4 +5,6 @@
 /rscript/00_rede/01_GTFS/results
 /rscript/00_rede/01_GTFS/_*
 /rscript/00_rede/01_GTFS/.*
+/rscript/01_qualificacao/dados/*
+/rscript/01_qualificacao/resultados/*
 .Rproj.user
