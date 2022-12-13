@@ -19,7 +19,7 @@ acc <- readr::read_csv('results/02_housing_acc_segreg/table/accessibility_distan
 
 load('results/02_housing_acc_segreg/table/segregation/localSegreg.rda')
 segreg <- lSeg %>% 
-  dplyr::filter(measure %in% 'G1_G1', bandwd == 1500) %>% 
+  dplyr::filter(measure %in% 'G3_G3', bandwd == 1500) %>% 
   dplyr::rename(seg = value) %>% 
   dplyr::select(id, seg)
 
@@ -551,39 +551,39 @@ p <- ggplot() +
   #                     geom="polygon") +
   # scale_fill_manual('# of HU of mcmv',
   #                   values = colorRampPalette(colRedBlue(3)[2:1])(quant+1)[2:6],
-  #                   guide = guide_colorsteps(order = 2,
-  #                                            show.limits = T,
-  #                                            title.position = "top",
-  #                                            barheight = base/45,
-  #                                            barwidth = base/3,
-  #                                            default.unit = "mm",
-  #                                            ticks.colour = NA,
-  #                                            override.aes = list(shape = NA,
-  #                                                                linetype = "blank")))  +
-  # 
-  # new_scale_fill()+
-  # #real estate
-  # geom_contour_filled(data = filter(z, db == 'regular real estate', z.value > 1),
-  #                     aes(lng, 
-  #                         lat,
-  #                         z = z.value,
-  #                         fill = stat(level)), 
-  #                     alpha = 0.6,
-  #                     bins=5,
-  #                     geom="polygon") +
-  # scale_fill_manual('# of HU of real estate market',
-  #                   values = colorRampPalette(colRedBlue(3)[2:3])(quant+1)[2:6],
-  #                   guide = guide_colorsteps(order = 2,
-  #                                            show.limits = T,
-  #                                            title.position = "top",
-  #                                            barheight = base/45,
-  #                                            barwidth = base/3,
-  #                                            default.unit = "mm",
-  #                                            ticks.colour = NA,
-  #                                            override.aes = list(shape = NA,
-  #                                                                linetype = "blank")))  +
-  labs(caption = paste0('Pre - PMCMV: 2002-2008; Post - PMCMV: 2009-2014\n',
-                        bg$caption))  +
+#                   guide = guide_colorsteps(order = 2,
+#                                            show.limits = T,
+#                                            title.position = "top",
+#                                            barheight = base/45,
+#                                            barwidth = base/3,
+#                                            default.unit = "mm",
+#                                            ticks.colour = NA,
+#                                            override.aes = list(shape = NA,
+#                                                                linetype = "blank")))  +
+# 
+# new_scale_fill()+
+# #real estate
+# geom_contour_filled(data = filter(z, db == 'regular real estate', z.value > 1),
+#                     aes(lng, 
+#                         lat,
+#                         z = z.value,
+#                         fill = stat(level)), 
+#                     alpha = 0.6,
+#                     bins=5,
+#                     geom="polygon") +
+# scale_fill_manual('# of HU of real estate market',
+#                   values = colorRampPalette(colRedBlue(3)[2:3])(quant+1)[2:6],
+#                   guide = guide_colorsteps(order = 2,
+#                                            show.limits = T,
+#                                            title.position = "top",
+#                                            barheight = base/45,
+#                                            barwidth = base/3,
+#                                            default.unit = "mm",
+#                                            ticks.colour = NA,
+#                                            override.aes = list(shape = NA,
+#                                                                linetype = "blank")))  +
+labs(caption = paste0('Pre - PMCMV: 2002-2008; Post - PMCMV: 2009-2014\n',
+                      bg$caption))  +
   ggspatial::annotation_scale(location = 'br', 
                               bar_cols = c('grey15', 'grey99'), 
                               line_width = 0.3,
@@ -600,23 +600,130 @@ ggsave(paste0('latex/scs_zeis/figure/results/map_heat_housing2.png'),
 
 # figure 07: scatterplot of segregation and accessibility ----
 
-# * numeric analysis ----
+# * numeric analysis with bivariate ----
 
 hs_df <- housing %>%
   dplyr::left_join(df, by = c('id_grid' = 'id')) %>% 
   mutate(db = factor(db,
                      levels = c('regular real estate', 'mcmv')))
 
-summary_mcmv <- hs_df %>% 
+hs_df %>% 
   sf::st_drop_geometry() %>% 
   dplyr::group_by(db, class, acc_seg) %>% 
-  dplyr::summarise(n = dplyr::n()) %>% 
+  dplyr::summarise(n = sum(uh)) %>% 
   dplyr::ungroup() %>% 
   dplyr::group_by(db, class) %>% 
   dplyr::mutate(perc = n/sum(n, na.rm=T)*100) %>% 
-  dplyr::filter(acc_seg == 13)
+  dplyr::arrange(db, class, -perc) %>% 
+  filter(acc_seg %in% c(11, 33))
 
-summary_mcmv
+# accessibility 
+acc_bar <- hs_df %>% 
+  sf::st_drop_geometry() %>% 
+  dplyr::group_by(db, class, range_acc) %>% 
+  dplyr::summarise(n = sum(uh)) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(db, class) %>% 
+  dplyr::mutate(perc = n/sum(n, na.rm=T),
+                var = 'accessibility',
+                db_class = paste(db, class, sep = ' - '),
+                db_class = factor(db_class,
+                                  levels = rev(c('mcmv - low',
+                                             'mcmv - medium',
+                                             'regular real estate - medium',
+                                             'regular real estate - high')))) %>%
+  rename(range = range_acc) 
+
+# segragation
+
+seg_bar <- hs_df %>% 
+  sf::st_drop_geometry() %>% 
+  dplyr::group_by(db, class, range_seg) %>% 
+  dplyr::summarise(n = sum(uh)) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(db, class) %>% 
+  dplyr::mutate(perc = n/sum(n, na.rm=T),
+                var = 'segregation',
+                db_class = paste(db, class, sep = ' - '),
+                db_class = factor(db_class,
+                                  levels = rev(c('mcmv - low',
+                                             'mcmv - medium',
+                                             'regular real estate - medium',
+                                             'regular real estate - high')))) %>% 
+  rename(range = range_seg) 
+
+acc_bar %>% 
+  ggplot() +
+  geom_bar(data = acc_bar,
+           aes(perc, 
+               db_class, 
+               fill = range), 
+           stat = 'identity',
+           position = 'stack') +
+  geom_text(data = acc_bar,
+            aes(perc, 
+                db_class, 
+                label = scales::percent(perc,
+                                        accuracy = 1,
+                                        scale=100),
+                group = range), 
+            stat = 'identity',
+            position = position_stack(vjust=0.5))+
+  scale_fill_stepsn(name = '% of total jobs',
+                    colors = col_acc,
+                    values = scales::rescale((1:3)-.5, 
+                                             from = c(0,3)),
+                    breaks = 0:3,
+                    labels = acc_div*100,
+                    limits = c(0, 3),
+                    expand = F,
+                    right = T,
+                    guide = guide_colorsteps(order = 2,
+                                             even.steps = F,
+                                             title.position = "top",
+                                             barheight = base/45,
+                                             barwidth = base/3,
+                                             default.unit = "mm",
+                                             ticks.colour = NA,
+                                             override.aes = list(shape = NA,
+                                                                 linetype = "blank")))+
+  new_scale_fill()+
+  geom_bar(data = seg_bar,
+           aes(perc, 
+               db_class, 
+               fill = range), 
+           stat = 'identity',
+           position = 'stack') +
+  geom_text(data = seg_bar,
+            aes(perc, 
+                db_class, 
+                label = scales::percent(perc,
+                                        accuracy = 1,
+                                        scale=100),
+                group = range), 
+            stat = 'identity',
+            position = position_stack(vjust=0.5))+
+  scale_fill_stepsn(name = 'local isolation of high class',
+                    colors = col_segreg,
+                    breaks = 0:3,
+                    values = scales::rescale((1:3)-.5, 
+                                             from = c(0,3)),
+                    labels = scales::scientific(round(seg_div,6), digits = 1),
+                    limits = c(0,3),
+                    expand = F,
+                    right = T,
+                    guide = guide_colorsteps(order = 3,
+                                             even.steps = F,
+                                             title.position = "top",
+                                             barheight = base/45,
+                                             barwidth = base/3,
+                                             default.unit = "mm",
+                                             ticks.colour = NA,
+                                             override.aes = list(shape = NA,
+                                                                 linetype = "blank")))+
+  facet_grid(.~var)+
+  theme_chart
+
 
 summary_mcmv <- hs_df %>% 
   sf::st_drop_geometry() %>% 
@@ -628,6 +735,33 @@ summary_mcmv <- hs_df %>%
   dplyr::filter(class == 'low')
 
 summary_mcmv
+
+
+
+# * barplot ----
+
+hs_df %>% 
+  sf::st_drop_geometry() %>% 
+  dplyr::group_by(db, class, acc_seg) %>% 
+  dplyr::summarise(n = sum(uh)) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(db, class) %>% 
+  dplyr::mutate(perc = n/sum(n, na.rm=T)*100) %>% 
+  dplyr::arrange(db, class, -perc) %>% 
+  ggplot() +
+  geom_bar(aes(perc, 
+               paste(db, class, sep = ' - '), 
+               fill = factor(acc_seg)), 
+           stat = 'identity',
+           position = 'stack') +
+  geom_text(aes(perc, 
+                paste(db, class, sep = ' - '), 
+                label = perc,
+                group = factor(acc_seg)), 
+            stat = 'identity',
+            position = position_stack(vjust=0.5))+
+  scale_fill_manual(values = colBivariate)+
+  theme_chart
 
 # * scatterplot ----
 
