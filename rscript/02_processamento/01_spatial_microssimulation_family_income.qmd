@@ -12,7 +12,9 @@ Replicação do processamento de microssimulação espacial feito para a [disser
 
 O objetivo principal foi analisar o potencial das ZEIS sobre as desigualdades de acesso ao trabalho, comparando com o programa Minha Casa Minha Vida (PMCMV) e a produção habitacional do mercado formal em São Paulo. Para tanto, foi necessário identificar quantas famílias deste município que se enquadrariam nas faixas do PMCMV, a partir da renda familiar mensal, e o seu local de residência. 
 
-Dado que os dados disponíveis pelos Resultados do Universo do Censo de 2010 não contém os domicílios por faixa de renda familiar mensal, foi aplicada a microssimulação espacial para a geração de uma "população" sintética de domicílios divida entre grupos de renda a partir dos Resultados da Amostra. O método aplicado foi o *Iterative Proportional Fitting* (IPF), o qual, de modo iterativo, calcula o peso do indivíduo (no caso, domicílio) a partir de uma variável em comum (chamada de restritiva) entre a amostra e o censo para obter a população desagregada na escala maior (setor censitário) com o valor da variável alvo presente apenas na escala menor.
+Dado que os dados disponíveis pelos Resultados do Universo do Censo de 2010 não contém os domicílios por faixa de renda familiar mensal, foi aplicada a microssimulação espacial para a geração de uma "população" sintética de domicílios divida entre grupos de renda a partir dos Resultados da Amostra. 
+
+O método aplicado foi o *Iterative Proportional Fitting* (IPF), o qual, de modo iterativo, calcula o peso do indivíduo (no caso, domicílio) a partir de uma variável em comum (chamada de restritiva) entre a amostra e o censo para obter a população desagregada na escala maior (setor censitário) com o valor da variável alvo presente apenas na escala menor.
 
 Os grupos de interesse são:
 
@@ -20,9 +22,6 @@ Os grupos de interesse são:
 * Grupo 2: renda familiar entre 3 a 10 salários-mínimos, que corresponde às faixas 2 e 3 do PMCMV e alvo da habitação de mercado popular;
 * Grupo 3: renda familiar acima de 10 salários-mínimos, que não eram atendidos pelo PMCMV
 
-## Organização do documento
-
-a ser preenchido
 
 ## Preparação do ambiente e carregando os dados
 
@@ -34,7 +33,8 @@ options(scipen=999)
 ```
 
 ```{r bibliotecas}
-#| echo: false 
+#| message: false
+#| warning: false
 
 # bibliotecas necessárias
 library(tidyverse)
@@ -54,8 +54,7 @@ Como mencionado, foram utilizados tanto os Resultados do Universo quanto da Amos
 A base de dados da amostra está em txt e sem separação, sendo necessário o uso do dicionário dos dados para a leitura do BD.
 
 ```{r leitura do dicionario da amostra}
-#| echo: false
-
+#| message: false
 # leitura do dicionário da amostra
 dic_amostra <- readxl::read_xls(
   file.path(dir_dados, 'Layout_microdados_Amostra.xls'),
@@ -92,7 +91,8 @@ ajusta_decimal <- function(x){
 ```
 
 ```{r leitura da amostra}
-#| echo: false
+#| message: false
+#| warning: false
 
 # microdados da amostra
 df_amostra <- vroom::vroom_fwf(
@@ -116,7 +116,8 @@ df_amostra <- vroom::vroom_fwf(
 ### Dados do universo
 
 ```{r leitura do universo}
-#| echo: false
+#| message: false
+#| warning: false
 
 df_universo <- read_delim(
   file.path(dir_dados, 'DomicilioRenda_SP1.csv'),
@@ -149,7 +150,7 @@ Para poder aplicar a função do IPF, é necessário que as categorias das duas 
 Também é gerada a variável alvo com a classificação do domicílio a partir da renda familiar, conforme já explicitado acima.
 
 ```{r}
-#| echo: false
+#| message: false
 
 # categorias existentes 
 var_restritivas <- c('V014', paste0('V', str_pad(5:13, 3, pad = '0')))
@@ -179,7 +180,7 @@ df_amostra_sp <- df_amostra %>%
 Para os dados do universo, será apenas necessário selecionar as variáveis de interesse e também identificar os setores censitários.
 
 ```{r}
-#| echo: false
+#| message: false
 
 df_universo_rest <- df_universo %>% 
   select(
@@ -197,6 +198,8 @@ df_universo_rest <- df_universo %>%
 A função abaixo foi retirada do [livro de Lovelace (2016)](https://spatial-microsim-book.robinlovelace.net/smsimr.html#mipfp) para posterior processamento dos pesos calculados a partir da função `mipfp::Ipfp`. Considerando que os pesos não necessariamente são números inteiros e que não é possível em um setor censitário conter metade de um domicílio, é necessário que os pesos sejam transformados em números inteiros. Para tanto, foi utilizado o método *Truncate, Replicate and Sample*.
 
 ```{r funcao trs}
+#| message: false
+
 int_trs <- function(x){
   # For generalisation purpose, x becomes a vector
   xv <- as.vector(x) # allows trs to work on matrices
@@ -300,6 +303,8 @@ sum(setor_grupos[,c('G1', 'G2', 'G3')])
 ```
 
 ```{r}
+#| message: false
+#| warning: false
 # total de democílios do mestrado
 setor_grupos_mestrado <- read_csv(file.path(dir_proj, 'data', 'population', 'population_micro_censustract.csv'))
 sum(setor_grupos_mestrado[,c('G1', 'G2', 'G3')], na.rm= T)
