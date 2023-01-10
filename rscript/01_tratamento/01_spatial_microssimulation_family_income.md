@@ -1,41 +1,57 @@
----
-title: "Microssimulação Espacial"
-format: 
-  gfm:
-    theme:
-      light: flatly
-      dark: darkly
-    toc: true
----
+Microssimulação Espacial
+================
 
-Replicação do processamento de microssimulação espacial feito para a [dissertação](https://doi.org/10.11606/D.3.2020.tde-31032021-143712). 
+- <a href="#preparação-do-ambiente-e-carregando-os-dados"
+  id="toc-preparação-do-ambiente-e-carregando-os-dados">Preparação do
+  ambiente e carregando os dados</a>
+  - <a href="#dados-da-amostra" id="toc-dados-da-amostra">Dados da
+    amostra</a>
+  - <a href="#dados-do-universo" id="toc-dados-do-universo">Dados do
+    universo</a>
+- <a href="#tratamento-dos-dados" id="toc-tratamento-dos-dados">Tratamento
+  dos dados</a>
+- <a href="#aplicação-do-ipf" id="toc-aplicação-do-ipf">Aplicação do
+  IPF</a>
+- <a href="#comparando-com-a-microssimulação-do-mestrado"
+  id="toc-comparando-com-a-microssimulação-do-mestrado">Comparando com a
+  microssimulação do mestrado</a>
+- <a href="#próximos-passos" id="toc-próximos-passos">Próximos passos</a>
 
-O objetivo principal foi analisar o potencial das ZEIS sobre as desigualdades de acesso ao trabalho, comparando com o programa Minha Casa Minha Vida (PMCMV) e a produção habitacional do mercado formal em São Paulo. Para tanto, foi necessário identificar quantas famílias deste município que se enquadrariam nas faixas do PMCMV, a partir da renda familiar mensal, e o seu local de residência. 
+Replicação do processamento de microssimulação espacial feito para a
+[dissertação](https://doi.org/10.11606/D.3.2020.tde-31032021-143712).
 
-Dado que os dados disponíveis pelos Resultados do Universo do Censo de 2010 não contém os domicílios por faixa de renda familiar mensal, foi aplicada a microssimulação espacial para a geração de uma "população" sintética de domicílios divida entre grupos de renda a partir dos Resultados da Amostra. 
+O objetivo principal foi analisar o potencial das ZEIS sobre as
+desigualdades de acesso ao trabalho, comparando com o programa Minha
+Casa Minha Vida (PMCMV) e a produção habitacional do mercado formal em
+São Paulo. Para tanto, foi necessário identificar quantas famílias deste
+município que se enquadrariam nas faixas do PMCMV, a partir da renda
+familiar mensal, e o seu local de residência.
 
-O método aplicado foi o *Iterative Proportional Fitting* (IPF), o qual, de modo iterativo, calcula o peso do indivíduo (no caso, domicílio) a partir de uma variável em comum (chamada de restritiva) entre a amostra e o censo para obter a população desagregada na escala maior (setor censitário) com o valor da variável alvo presente apenas na escala menor.
+Dado que os dados disponíveis pelos Resultados do Universo do Censo de
+2010 não contém os domicílios por faixa de renda familiar mensal, foi
+aplicada a microssimulação espacial para a geração de uma “população”
+sintética de domicílios divida entre grupos de renda a partir dos
+Resultados da Amostra.
+
+O método aplicado foi o *Iterative Proportional Fitting* (IPF), o qual,
+de modo iterativo, calcula o peso do indivíduo (no caso, domicílio) a
+partir de uma variável em comum (chamada de restritiva) entre a amostra
+e o censo para obter a população desagregada na escala maior (setor
+censitário) com o valor da variável alvo presente apenas na escala
+menor.
 
 Os grupos de interesse são:
 
-* Grupo 1: renda familiar até 3 salários-mínimos, que corresponde à faixa 1 do PMCMV e alvo da habitação de interesse social;
-* Grupo 2: renda familiar entre 3 a 10 salários-mínimos, que corresponde às faixas 2 e 3 do PMCMV e alvo da habitação de mercado popular;
-* Grupo 3: renda familiar acima de 10 salários-mínimos, que não eram atendidos pelo PMCMV
-
+- Grupo 1: renda familiar até 3 salários-mínimos, que corresponde à
+  faixa 1 do PMCMV e alvo da habitação de interesse social;
+- Grupo 2: renda familiar entre 3 a 10 salários-mínimos, que corresponde
+  às faixas 2 e 3 do PMCMV e alvo da habitação de mercado popular;
+- Grupo 3: renda familiar acima de 10 salários-mínimos, que não eram
+  atendidos pelo PMCMV
 
 ## Preparação do ambiente e carregando os dados
 
-```{r config geral}
-#| echo: false
-#| include: false
-
-options(scipen=999)
-```
-
-```{r bibliotecas}
-#| message: false
-#| warning: false
-
+``` r
 # bibliotecas necessárias
 library(tidyverse)
 library(sf)
@@ -47,14 +63,16 @@ dir_proj <- here::here()
 dir_dados <- file.path(dir_proj, 'data', 'population', 'census2010')
 ```
 
-Como mencionado, foram utilizados tanto os Resultados do Universo quanto da Amostra do Censo 2010 e eles estão disponíveis no próprio [site do IBGE](http://ftp.ibge.gov.br/Censos/Censo_Demografico_2010/).
+Como mencionado, foram utilizados tanto os Resultados do Universo quanto
+da Amostra do Censo 2010 e eles estão disponíveis no próprio [site do
+IBGE](http://ftp.ibge.gov.br/Censos/Censo_Demografico_2010/).
 
-### Dados da amostra 
+### Dados da amostra
 
-A base de dados da amostra está em txt e sem separação, sendo necessário o uso do dicionário dos dados para a leitura do BD.
+A base de dados da amostra está em txt e sem separação, sendo necessário
+o uso do dicionário dos dados para a leitura do BD.
 
-```{r leitura do dicionario da amostra}
-#| message: false
+``` r
 # leitura do dicionário da amostra
 dic_amostra <- readxl::read_xls(
   file.path(dir_dados, 'Layout_microdados_Amostra.xls'),
@@ -68,12 +86,15 @@ dic_amostra <- readxl::read_xls(
   ) %>% 
   # seleciona colunas de interesse
   select(
-    'VAR', 'NOME', 'POSICAO_INICIAL', 'POSICAO_FINAL',	'INT', 'DEC', 'TIPO'
+    'VAR', 'NOME', 'POSICAO_INICIAL', 'POSICAO_FINAL',  'INT', 'DEC', 'TIPO'
   )
 ```
-A base da amostra tem algumas colunas que têm casas decimais (`DEC`) além de números inteiros (`INT`). A função abaixo vai tratar essas variáveis durante a leitura da base de dados.
 
-```{r func ajuste decimal na amosta}
+A base da amostra tem algumas colunas que têm casas decimais (`DEC`)
+além de números inteiros (`INT`). A função abaixo vai tratar essas
+variáveis durante a leitura da base de dados.
+
+``` r
 ajusta_decimal <- function(x){
   
   # seleciona a linha da variável no dicionário
@@ -90,10 +111,7 @@ ajusta_decimal <- function(x){
 }
 ```
 
-```{r leitura da amostra}
-#| message: false
-#| warning: false
-
+``` r
 # microdados da amostra
 df_amostra <- vroom::vroom_fwf(
   file = file.path(dir_dados, 'Amostra_Domicilios_35_RMSP.txt'),
@@ -115,10 +133,7 @@ df_amostra <- vroom::vroom_fwf(
 
 ### Dados do universo
 
-```{r leitura do universo}
-#| message: false
-#| warning: false
-
+``` r
 df_universo <- read_delim(
   file.path(dir_dados, 'DomicilioRenda_SP1.csv'),
   delim = ';',
@@ -132,26 +147,30 @@ relacao_areap_setor <- read_tsv(
 ) %>% #filtra apenas município de São Paulo
   filter(str_sub(Setor, 1, 7) == '3550308') 
 ```
-## Tratamento dos dados 
 
-Para poder aplicar a função do IPF, é necessário que as categorias das duas bases de dados tenham a mesma nomenclatura. Portanto, vamos primeiro criar as classes para os dados da amostra, a partir da variável `V6532` (renda per capita do domicílio) com base nas categorias dos dados do universo, a saber:
+## Tratamento dos dados
 
-* V014: domicílios no setor sem rendimento
-* V005: domicílios no setor com renda per capita de até 1/8 SM
-* V006: domicílios no setor com renda per capita de 1/8 SM até 1/4 SM
-* V007: domicílios no setor com renda per capita de 1/4 SM até 1/2 SM
-* V008: domicílios no setor com renda per capita de 1/2 SM até 1 SM
-* V009: domicílios no setor com renda per capita de 1 SM até 2 SM
-* V010: domicílios no setor com renda per capita de 2 SM até 3 SM
-* V011: domicílios no setor com renda per capita de 3 SM até 5 SM
-* V012: domicílios no setor com renda per capita de 5 SM até 10 SM
-* V013: domicílios no setor com renda per capita acima de 10 SM 
+Para poder aplicar a função do IPF, é necessário que as categorias das
+duas bases de dados tenham a mesma nomenclatura. Portanto, vamos
+primeiro criar as classes para os dados da amostra, a partir da variável
+`V6532` (renda per capita do domicílio) com base nas categorias dos
+dados do universo, a saber:
 
-Também é gerada a variável alvo com a classificação do domicílio a partir da renda familiar, conforme já explicitado acima.
+- V014: domicílios no setor sem rendimento
+- V005: domicílios no setor com renda per capita de até 1/8 SM
+- V006: domicílios no setor com renda per capita de 1/8 SM até 1/4 SM
+- V007: domicílios no setor com renda per capita de 1/4 SM até 1/2 SM
+- V008: domicílios no setor com renda per capita de 1/2 SM até 1 SM
+- V009: domicílios no setor com renda per capita de 1 SM até 2 SM
+- V010: domicílios no setor com renda per capita de 2 SM até 3 SM
+- V011: domicílios no setor com renda per capita de 3 SM até 5 SM
+- V012: domicílios no setor com renda per capita de 5 SM até 10 SM
+- V013: domicílios no setor com renda per capita acima de 10 SM
 
-```{r}
-#| message: false
+Também é gerada a variável alvo com a classificação do domicílio a
+partir da renda familiar, conforme já explicitado acima.
 
+``` r
 # categorias existentes 
 var_restritivas <- c('V014', paste0('V', str_pad(5:13, 3, pad = '0')))
 
@@ -177,11 +196,10 @@ df_amostra_sp <- df_amostra %>%
     ))
 ```
 
-Para os dados do universo, será apenas necessário selecionar as variáveis de interesse e também identificar os setores censitários.
+Para os dados do universo, será apenas necessário selecionar as
+variáveis de interesse e também identificar os setores censitários.
 
-```{r}
-#| message: false
-
+``` r
 df_universo_rest <- df_universo %>% 
   select(
     all_of(c(
@@ -195,11 +213,16 @@ df_universo_rest <- df_universo %>%
 
 ## Aplicação do IPF
 
-A função abaixo foi retirada do [livro de Lovelace (2016)](https://spatial-microsim-book.robinlovelace.net/smsimr.html#mipfp) para posterior processamento dos pesos calculados a partir da função `mipfp::Ipfp`. Considerando que os pesos não necessariamente são números inteiros e que não é possível em um setor censitário conter metade de um domicílio, é necessário que os pesos sejam transformados em números inteiros. Para tanto, foi utilizado o método *Truncate, Replicate and Sample*.
+A função abaixo foi retirada do [livro de Lovelace
+(2016)](https://spatial-microsim-book.robinlovelace.net/smsimr.html#mipfp)
+para posterior processamento dos pesos calculados a partir da função
+`mipfp::Ipfp`. Considerando que os pesos não necessariamente são números
+inteiros e que não é possível em um setor censitário conter metade de um
+domicílio, é necessário que os pesos sejam transformados em números
+inteiros. Para tanto, foi utilizado o método *Truncate, Replicate and
+Sample*.
 
-```{r funcao trs}
-#| message: false
-
+``` r
 int_trs <- function(x){
   # For generalisation purpose, x becomes a vector
   xv <- as.vector(x) # allows trs to work on matrices
@@ -217,10 +240,12 @@ int_trs <- function(x){
 }
 ```
 
-O IPF foi aplicado para cada área de ponderação (AP) dentro do município de São Paulo. O processo para cada AP também já considera a inteirização e retorna a quantidade sintética de domicílios em cada setor censitário para cada grupo de renda familiar.
+O IPF foi aplicado para cada área de ponderação (AP) dentro do município
+de São Paulo. O processo para cada AP também já considera a inteirização
+e retorna a quantidade sintética de domicílios em cada setor censitário
+para cada grupo de renda familiar.
 
-```{r IPF}
-
+``` r
 # identifica todas as aps de São Paulo
 areas_ponderacao <- unique(relacao_areap_setor$`Área de ponderação`)
 
@@ -296,22 +321,22 @@ setor_grupos <- map_df(areas_ponderacao, function(ap){
 
 ## Comparando com a microssimulação do mestrado
 
-```{r}
+``` r
 # total de domicílios do resultado
 sum(setor_grupos[,c('G1', 'G2', 'G3')])
-
 ```
 
-```{r}
-#| message: false
-#| warning: false
+    [1] 3574721
+
+``` r
 # total de democílios do mestrado
 setor_grupos_mestrado <- read_csv(file.path(dir_proj, 'data', 'population', 'population_micro_censustract.csv'))
 sum(setor_grupos_mestrado[,c('G1', 'G2', 'G3')], na.rm= T)
 ```
 
+    [1] 3574349
+
 ## Próximos passos
 
-Seria interessante incluir outras variáveis restritivas, como número de moradores, tipo de espécie de domicílio, e condição de ocupação.
-
-
+Seria interessante incluir outras variáveis restritivas, como número de
+moradores, tipo de espécie de domicílio, e condição de ocupação.
