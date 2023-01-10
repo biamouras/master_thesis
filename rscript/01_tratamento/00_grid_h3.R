@@ -1,4 +1,6 @@
-#' Processes the grid and the centroids by the H3
+#' A base espacial de análise utilizada na dissertação foi a biblioteca de hexágonos
+#' desenvolvida pela Uber. O código foi adaptado em 01/2023 para estar adequado com a
+#' nova nomenclatura da biblioteca utilizada `h3jsr`
 
 # Libraries ----
 library(tidyverse)
