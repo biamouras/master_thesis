@@ -1,4 +1,4 @@
-> Em construção
+> Em construção - infelizmente perdi os principais scripts de preparação e processamento dos dados utilizados no desenvolvimento do mestrado. Além de ter o interesse em permitir a reprodução das análises, como estudo, estou recriando os scripts para documentação.
 
 # As ZEIS e o acesso à cidade: o impacto das ZEIS na desigualdade da habitação por promoção privada em São Paulo
 
@@ -21,3 +21,9 @@ Sustentabilidade social, no que se refere a equidades sociais, está relacionada
  ## 📁 Organização do projeto
  
  > Em construção
+
+Os scripts foram organizados em:
+
+ 01_tratamento: 
+ 02_processamento:
+ 03_vizualização:
