@@ -9,3 +9,4 @@
 /rscript/02_processamento/01_spatial_microssimulation_family_income_files/*
 .Rproj.user
 *.qmd
+rosm.cache/*
