@@ -10,3 +10,5 @@
 .Rproj.user
 *.qmd
 rosm.cache/*
+rscript/00_rede/*
+rscript/01_tratamento/00_rede/*
